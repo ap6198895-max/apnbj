@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AquaSense — Smart Cooler Monitoring</title>
+<style>
+  :root{
+    --bg-deep:#091116;
+    --bg-panel:#101b24;
+    --bg-card:#13212c;
+    --line:#223240;
+    --teal:#3ddad7;
+    --teal-dim:#1d6e6c;
+    --amber:#ffb454;
+    --red:#ff6b6b;
+    --green:#5fd99e;
+    --ink:#dce8ee;
+    --ink-dim:#7e96a3;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:
+      radial-gradient(800px 420px at 90% -8%, #143038 0%, transparent 60%),
+      radial-gradient(600px 360px at 0% 0%, #102230 0%, transparent 55%),
+      var(--bg-deep);
+    color:var(--ink);
+    font-family:-apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height:100vh;
+    padding:32px 24px 70px;
+  }
+  .wrap{ max-width:1180px; margin:0 auto; }
+
+  /* HEADER */
+  header{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:18px; margin-bottom:28px; }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .logo{ width:38px; height:38px; border-radius:10px; background:linear-gradient(135deg, var(--teal), var(--teal-dim)); display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+  .brand-name{ font-weight:700; font-size:19px; letter-spacing:0.3px; }
+  .brand-sub{ font-size:11px; color:var(--ink-dim); letter-spacing:1.2px; text-transform:uppercase; margin-top:1px; }
+  .device-select{ display:flex; align-items:center; gap:10px; }
+  .device-select select{
+    background:var(--bg-card); color:var(--ink); border:1px solid var(--line);
+    padding:9px 14px; border-radius:8px; font-size:13px; outline:none;
+  }
+  .live-dot{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-dim); }
+  .live-dot i{ width:8px; height:8px; border-radius:50%; background:var(--green); display:inline-block; box-shadow:0 0 8px 1px var(--green); animation:pulse 1.6s infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+
+  /* TOP STATUS STRIP */
+  .status-strip{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-bottom:26px; }
+  .status-card{
+    background:var(--bg-card); border:1px solid var(--line); border-radius:14px;
+    padding:18px 20px; display:flex; flex-direction:column; gap:6px; position:relative; overflow:hidden;
+  }
+  .status-card .label{ font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--ink-dim); }
+  .status-card .value{ font-size:26px; font-weight:700; }
+  .status-card .sub{ font-size:12px; color:var(--ink-dim); }
+  .badge{ display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:20px; font-size:11px; font-weight:600; letter-spacing:0.3px; width:fit-content; }
+  .badge.good{ background:rgba(95,217,158,0.15); color:var(--green); }
+  .badge.warn{ background:rgba(255,180,84,0.15); color:var(--amber); }
+  .badge.crit{ background:rgba(255,107,107,0.15); color:var(--red); }
+
+  /* LAYOUT GRID */
+  .main-grid{ display:grid; grid-template-columns:1.4fr 1fr; gap:18px; }
+  @media (max-width:880px){ .main-grid{ grid-template-columns:1fr; } }
+
+  .panel{ background:var(--bg-panel); border:1px solid var(--line); border-radius:16px; padding:22px; margin-bottom:18px; }
+  .panel-title{ font-size:13px; font-weight:600; letter-spacing:0.5px; color:var(--ink); display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  .panel-title span.sub{ font-size:11px; color:var(--ink-dim); font-weight:400; }
+
+  /* GAUGES (water quality) */
+  .gauge-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  .gauge-card{ text-align:center; }
+  .gauge-card svg{ width:100%; height:auto; }
+  .gauge-card .g-label{ font-size:11px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:1px; margin-top:6px; }
+  .gauge-card .g-value{ font-size:20px; font-weight:700; margin-top:2px; }
+  .gauge-card .g-range{ font-size:10px; color:var(--ink-dim); }
+
+  /* MAINTENANCE RISK RING */
+  .risk-wrap{ display:flex; align-items:center; gap:24px; flex-wrap:wrap; }
+  .risk-ring{ flex-shrink:0; }
+  .risk-detail{ flex:1; min-width:180px; }
+  .risk-status{ font-size:22px; font-weight:700; margin-bottom:4px; }
+  .risk-desc{ font-size:13px; color:var(--ink-dim); line-height:1.5; }
+  .component-bars{ margin-top:16px; display:flex; flex-direction:column; gap:10px; }
+  .comp-row{ display:flex; align-items:center; gap:10px; font-size:12px; }
+  .comp-row .name{ width:120px; color:var(--ink-dim); flex-shrink:0; }
+  .comp-track{ flex:1; height:7px; background:var(--bg-card); border-radius:4px; overflow:hidden; }
+  .comp-fill{ height:100%; border-radius:4px; transition:width .6s ease; }
+  .comp-pct{ width:36px; text-align:right; color:var(--ink-dim); }
+
+  /* CHART */
+  .chart-wrap{ position:relative; height:180px; }
+  canvas{ width:100%; height:100%; display:block; }
+
+  /* ALERTS */
+  .alert-list{ display:flex; flex-direction:column; gap:10px; max-height:340px; overflow-y:auto; }
+  .alert-item{ display:flex; gap:12px; padding:12px 14px; border-radius:10px; background:var(--bg-card); border:1px solid var(--line); align-items:flex-start; }
+  .alert-item .dot{ width:9px; height:9px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+  .alert-item .dot.warn{ background:var(--amber); box-shadow:0 0 6px var(--amber); }
+  .alert-item .dot.crit{ background:var(--red); box-shadow:0 0 6px var(--red); }
+  .alert-item .body{ flex:1; }
+  .alert-item .msg{ font-size:13px; line-height:1.4; }
+  .alert-item .meta{ font-size:11px; color:var(--ink-dim); margin-top:3px; }
+  .empty-alerts{ font-size:12px; color:var(--ink-dim); text-align:center; padding:20px 0; }
+
+  /* LOG / SERVICE */
+  .log-form{ display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .log-form select, .log-form input{
+    background:var(--bg-card); border:1px solid var(--line); color:var(--ink);
+    padding:9px 12px; border-radius:8px; font-size:12px; outline:none;
+  }
+  .log-form input{ flex:1; min-width:120px; }
+  .log-form button{ background:var(--teal); color:#06201f; border:none; padding:9px 16px; border-radius:8px; font-weight:600; font-size:12px; cursor:pointer; }
+  .log-entries{ font-size:12px; color:var(--ink-dim); display:flex; flex-direction:column; gap:8px; max-height:140px; overflow-y:auto; }
+  .log-entries .entry{ border-left:2px solid var(--teal-dim); padding-left:10px; }
+  .log-entries .entry b{ color:var(--ink); }
+
+  footer{ text-align:center; margin-top:30px; font-size:11px; color:var(--ink-dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="logo">💧</div>
+      <div>
+        <div class="brand-name">AquaSense</div>
+        <div class="brand-sub">Predictive Maintenance & Water Quality</div>
+      </div>
+    </div>
+    <div class="device-select">
+      <select id="device-select">
+        <option value="SC-001">Lobby Cooler — SC-001</option>
+        <option value="SC-002">2nd Floor Cooler — SC-002</option>
+        <option value="SC-003">Cafeteria Cooler — SC-003</option>
+      </select>
+      <div class="live-dot"><i></i> Live (simulated)</div>
+    </div>
+  </header>
+
+  <div class="status-strip">
+    <div class="status-card">
+      <div class="label">Water Quality</div>
+      <div class="value" id="wq-status-text">Good</div>
+      <span class="badge good" id="wq-badge">Within safe range</span>
+    </div>
+    <div class="status-card">
+      <div class="label">Maintenance Risk</div>
+      <div class="value" id="risk-status-text">Healthy</div>
+      <span class="badge good" id="risk-badge">Score 0.00</span>
+    </div>
+    <div class="status-card">
+      <div class="label">Filter Age</div>
+      <div class="value" id="filter-age">0 days</div>
+      <div class="sub">Recommended: 90 days</div>
+    </div>
+    <div class="status-card">
+      <div class="label">Compressor Runtime</div>
+      <div class="value" id="runtime-hours">0 h</div>
+      <div class="sub">Service interval: 8000 h</div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div>
+      <div class="panel">
+        <div class="panel-title">Water Quality Sensors <span class="sub">updates every 4s</span></div>
+        <div class="gauge-grid">
+          <div class="gauge-card" id="gauge-tds"></div>
+          <div class="gauge-card" id="gauge-ph"></div>
+          <div class="gauge-card" id="gauge-turb"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Compressor Vibration Trend <span class="sub">last 30 readings</span></div>
+        <div class="chart-wrap"><canvas id="trend-canvas"></canvas></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Service Log</div>
+        <div class="log-form">
+          <select id="log-action">
+            <option value="filter_replacement">Filter replacement</option>
+            <option value="compressor_service">Compressor service</option>
+            <option value="general_inspection">General inspection</option>
+          </select>
+          <input type="text" id="log-note" placeholder="Notes (optional)">
+          <button id="log-submit">Log service</button>
+        </div>
+        <div class="log-entries" id="log-entries">
+          <div class="empty-alerts">No service history yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <div class="panel-title">Predictive Maintenance Risk</div>
+        <div class="risk-wrap">
+          <div class="risk-ring" id="risk-ring"></div>
+          <div class="risk-detail">
+            <div class="risk-status" id="risk-detail-status">Healthy</div>
+            <div class="risk-desc" id="risk-detail-desc">All systems operating within normal parameters.</div>
+            <div class="component-bars" id="component-bars"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Active Alerts <span class="sub" id="alert-count">0</span></div>
+        <div class="alert-list" id="alert-list">
+          <div class="empty-alerts">No active alerts.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>AquaSense Dashboard — demo mode with simulated live telemetry. Connect to your backend API to use real device data.</footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+// ---------------------------------------------------------------
+// Simulated telemetry engine (replace with real API calls later)
+// ---------------------------------------------------------------
+var state = {
+  "SC-001": freshState(15),
+  "SC-002": freshState(70),
+  "SC-003": freshState(140),
+};
+var currentDevice = "SC-001";
+var vibHistory = [];
+var alerts = [];
+var logs = [];
+
+function freshState(filterAgeDays){
+  return {
+    tds: 180, ph: 7.1, turbidity: 0.3,
+    current: 3.2, vibration: 1.4, pressureDrop: 8,
+    runtimeHours: 1200 + Math.random()*4000,
+    filterAgeDays: filterAgeDays
+  };
+}
+
+function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+function jitter(v, amt){ return v + (Math.random()-0.5)*amt; }
+
+function stepSimulation(){
+  var s = state[currentDevice];
+  s.tds = clamp(jitter(s.tds, 25), 120, 1300);
+  s.ph = clamp(jitter(s.ph, 0.12), 5.8, 9.8);
+  s.turbidity = clamp(jitter(s.turbidity, 0.15), 0.05, 6);
+  s.current = clamp(jitter(s.current, 0.3), 2.5, 7.5);
+  s.vibration = clamp(jitter(s.vibration, 0.25), 0.8, 5);
+  s.pressureDrop = clamp(jitter(s.pressureDrop, 1.5), 4, 38);
+  s.runtimeHours += Math.random()*0.5;
+  s.filterAgeDays += 0.02;
+
+  // Occasionally simulate a clear "incident" so alerts feel real
+  if(Math.random() < 0.04){ s.tds = 1100; }
+  if(Math.random() < 0.03){ s.vibration = clamp(s.vibration + 1.8, 0, 5); }
+
+  vibHistory.push(s.vibration);
+  if(vibHistory.length > 30) vibHistory.shift();
+}
+
+// ---------------------------------------------------------------
+// Water quality evaluation (mirrors backend thresholds)
+// ---------------------------------------------------------------
+function evaluateWaterQuality(s){
+  var issues = [];
+  if(s.tds >= 1000) issues.push({param:'TDS', value:s.tds.toFixed(0)+' ppm', severity:'crit', msg:'TDS reading of '+s.tds.toFixed(0)+' ppm far exceeds safe drinking limits (>1000 ppm).'});
+  else if(s.tds >= 500) issues.push({param:'TDS', value:s.tds.toFixed(0)+' ppm', severity:'warn', msg:'TDS reading of '+s.tds.toFixed(0)+' ppm is above the recommended limit (500 ppm).'});
+
+  if(s.ph <= 6.0 || s.ph >= 9.5) issues.push({param:'pH', value:s.ph.toFixed(2), severity:'crit', msg:'pH level of '+s.ph.toFixed(2)+' is critically outside the safe range (6.0-9.5).'});
+  else if(s.ph <= 6.5 || s.ph >= 8.5) issues.push({param:'pH', value:s.ph.toFixed(2), severity:'warn', msg:'pH level of '+s.ph.toFixed(2)+' is outside the ideal range (6.5-8.5).'});
+
+  if(s.turbidity >= 5) issues.push({param:'Turbidity', value:s.turbidity.toFixed(2)+' NTU', severity:'crit', msg:'Turbidity of '+s.turbidity.toFixed(2)+' NTU is critically high (>5 NTU).'});
+  else if(s.turbidity >= 1) issues.push({param:'Turbidity', value:s.turbidity.toFixed(2)+' NTU', severity:'warn', msg:'Turbidity of '+s.turbidity.toFixed(2)+' NTU exceeds the recommended limit (1 NTU).'});
+
+  return issues;
+}
+
+// ---------------------------------------------------------------
+// Predictive maintenance scoring (mirrors backend logic)
+// ---------------------------------------------------------------
+function computeRisk(s){
+  function norm(v, normalMax, fail){ if(v<=normalMax) return 0; if(v>=fail) return 1; return (v-normalMax)/(fail-normalMax); }
+  var currentScore = norm(s.current, 4.5, 7.0);
+  var vibScore = norm(s.vibration, 2.8, 4.5);
+  var clogScore = norm(s.pressureDrop, 15, 35);
+  var ageScore = clamp(s.filterAgeDays/90, 0, 1);
+  var runtimeScore = clamp(s.runtimeHours/8000, 0, 1);
+
+  var trendBonus = 0;
+  if(vibHistory.length >= 5){
+    var first = vibHistory[0], last = vibHistory[vibHistory.length-1];
+    if(last > first*1.15) trendBonus = 0.12;
+  }
+
+  var weighted = currentScore*0.25 + vibScore*0.25 + clogScore*0.2 + ageScore*0.1 + runtimeScore*0.1;
+  var risk = clamp(weighted + trendBonus, 0, 1);
+
+  var status = 'healthy';
+  if(risk >= 0.75) status = 'service_now';
+  else if(risk >= 0.45) status = 'service_soon';
+  else if(risk >= 0.2) status = 'monitor';
+
+  var compAlerts = [];
+  if(Math.max(currentScore, vibScore) >= 0.6){
+    compAlerts.push({severity: Math.max(currentScore,vibScore)>=0.85?'crit':'warn', msg:'Compressor readings indicate elevated mechanical stress. Inspection recommended.'});
+  }
+  if(clogScore >= 0.5 || ageScore >= 0.9){
+    compAlerts.push({severity: (clogScore>=0.8||ageScore>=1)?'crit':'warn', msg:'Filter shows signs of clogging or has exceeded recommended lifespan ('+Math.round(s.filterAgeDays)+' days). Replacement recommended.'});
+  }
+  if(trendBonus>0){
+    compAlerts.push({severity:'warn', msg:'Compressor vibration shows a rising trend over recent readings — early sign of wear.'});
+  }
+
+  return {
+    risk: risk, status: status,
+    components: { current: currentScore, vibration: vibScore, clogging: clogScore, age: ageScore, runtime: runtimeScore },
+    alerts: compAlerts
+  };
+}
+
+// ---------------------------------------------------------------
+// Rendering helpers
+// ---------------------------------------------------------------
+function statusLabel(status){
+  return {healthy:'Healthy', monitor:'Monitor', service_soon:'Service Soon', service_now:'Service Now'}[status] || status;
+}
+function statusClass(status){
+  if(status==='healthy') return 'good';
+  if(status==='monitor') return 'warn';
+  return 'crit';
+}
+
+function drawGauge(elId, label, value, unit, min, max, warnAt, critAt, decimals){
+  var pct = clamp((value-min)/(max-min), 0, 1);
+  var angle = -120 + pct*240; // -120 to +120 degrees
+  var color = value>=critAt ? 'var(--red)' : (value>=warnAt ? 'var(--amber)' : 'var(--teal)');
+  var r = 42, cx=60, cy=60;
+  var startAngle = -210 * Math.PI/180, endAngle = 30 * Math.PI/180;
+  function polar(cx,cy,r,ang){ return [cx + r*Math.cos(ang), cy + r*Math.sin(ang)]; }
+  var arcStart = polar(cx,cy,r,startAngle);
+  var arcEnd = polar(cx,cy,r,endAngle);
+  var needleAngle = startAngle + pct*(endAngle-startAngle);
+  var needleEnd = polar(cx,cy,r-8,needleAngle);
+
+  var svg = '<svg viewBox="0 0 120 92">' +
+    '<path d="M '+arcStart[0]+' '+arcStart[1]+' A '+r+' '+r+' 0 1 1 '+arcEnd[0]+' '+arcEnd[1]+'" fill="none" stroke="#223240" stroke-width="9" stroke-linecap="round"/>' +
+    '<path d="M '+arcStart[0]+' '+arcStart[1]+' A '+r+' '+r+' 0 1 1 '+arcEnd[0]+' '+arcEnd[1]+'" fill="none" stroke="'+color+'" stroke-width="9" stroke-linecap="round" stroke-dasharray="'+(pct*220)+' 220"/>' +
+    '<line x1="'+cx+'" y1="'+cy+'" x2="'+needleEnd[0]+'" y2="'+needleEnd[1]+'" stroke="'+color+'" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<circle cx="'+cx+'" cy="'+cy+'" r="3.5" fill="'+color+'"/>' +
+    '</svg>';
+
+  document.getElementById(elId).innerHTML = svg +
+    '<div class="g-value">'+value.toFixed(decimals)+unit+'</div>' +
+    '<div class="g-label">'+label+'</div>';
+}
+
+function drawRiskRing(score, status){
+  var pct = clamp(score,0,1);
+  var color = status==='healthy' ? 'var(--green)' : status==='monitor' ? 'var(--teal)' : status==='service_soon' ? 'var(--amber)' : 'var(--red)';
+  var r=46, cx=58, cy=58, circ = 2*Math.PI*r;
+  var svg = '<svg width="120" height="120" viewBox="0 0 116 116">' +
+    '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="#223240" stroke-width="10"/>' +
+    '<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="10" stroke-linecap="round" ' +
+      'stroke-dasharray="'+circ+'" stroke-dashoffset="'+(circ*(1-pct))+'" transform="rotate(-90 '+cx+' '+cy+')"/>' +
+    '<text x="'+cx+'" y="'+(cy+6)+'" text-anchor="middle" font-size="22" font-weight="700" fill="'+color+'">'+Math.round(pct*100)+'</text>' +
+    '</svg>';
+  document.getElementById('risk-ring').innerHTML = svg;
+}
+
+function renderComponentBars(components){
+  var labels = { current:'Compressor Current', vibration:'Vibration', clogging:'Filter Clogging', age:'Filter Age', runtime:'Compressor Runtime' };
+  var html = '';
+  Object.keys(components).forEach(function(k){
+    var v = components[k];
+    var color = v>=0.75?'var(--red)':v>=0.45?'var(--amber)':'var(--teal)';
+    html += '<div class="comp-row"><div class="name">'+labels[k]+'</div><div class="comp-track"><div class="comp-fill" style="width:'+(v*100)+'%;background:'+color+'"></div></div><div class="comp-pct">'+Math.round(v*100)+'%</div></div>';
+  });
+  document.getElementById('component-bars').innerHTML = html;
+}
+
+function renderAlerts(waterIssues, maintIssues){
+  var all = [];
+  waterIssues.forEach(function(i){ all.push({severity:i.severity, msg:i.msg, tag:'Water Quality · '+i.param}); });
+  maintIssues.forEach(function(i){ all.push({severity:i.severity, msg:i.msg, tag:'Maintenance'}); });
+
+  document.getElementById('alert-count').textContent = all.length;
+  var list = document.getElementById('alert-list');
+  if(all.length===0){ list.innerHTML = '<div class="empty-alerts">No active alerts.</div>'; return; }
+  list.innerHTML = all.map(function(a){
+    return '<div class="alert-item"><div class="dot '+a.severity+'"></div><div class="body"><div class="msg">'+a.msg+'</div><div class="meta">'+a.tag+' · just now</div></div></div>';
+  }).join('');
+}
+
+function drawTrendChart(){
+  var canvas = document.getElementById('trend-canvas');
+  var ctx = canvas.getContext('2d');
+  var w = canvas.clientWidth, h = canvas.clientHeight;
+  canvas.width = w * devicePixelRatio; canvas.height = h * devicePixelRatio;
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  ctx.clearRect(0,0,w,h);
+
+  if(vibHistory.length < 2) return;
+  var max = 5, min = 0;
+  var pad = 20;
+  var stepX = (w - pad*2) / (vibHistory.length-1);
+
+  // grid lines
+  ctx.strokeStyle = '#1c2b38';
+  ctx.lineWidth = 1;
+  for(var g=0; g<=4; g++){
+    var y = pad + (h-pad*2)*g/4;
+    ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(w-pad,y); ctx.stroke();
+  }
+
+  // threshold line at 2.8 (normal max)
+  var ty = pad + (h-pad*2)*(1-(2.8-min)/(max-min));
+  ctx.strokeStyle = '#3a4d5c';
+  ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(pad,ty); ctx.lineTo(w-pad,ty); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // line
+  ctx.beginPath();
+  vibHistory.forEach(function(v,i){
+    var x = pad + i*stepX;
+    var y = pad + (h-pad*2)*(1-(v-min)/(max-min));
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.strokeStyle = '#3ddad7';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // fill
+  var lastX = pad + (vibHistory.length-1)*stepX;
+  ctx.lineTo(lastX, h-pad);
+  ctx.lineTo(pad, h-pad);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(61,218,215,0.08)';
+  ctx.fill();
+
+  // last point dot
+  var lastV = vibHistory[vibHistory.length-1];
+  var lastY = pad + (h-pad*2)*(1-(lastV-min)/(max-min));
+  ctx.beginPath();
+  ctx.arc(lastX, lastY, 4, 0, Math.PI*2);
+  ctx.fillStyle = '#3ddad7';
+  ctx.fill();
+}
+
+function render(){
+  var s = state[currentDevice];
+  var waterIssues = evaluateWaterQuality(s);
+  var maintResult = computeRisk(s);
+
+  // Top status strip
+  var wqStatus = waterIssues.some(i=>i.severity==='crit') ? 'crit' : waterIssues.some(i=>i.severity==='warn') ? 'warn' : 'good';
+  document.getElementById('wq-status-text').textContent = wqStatus==='good'?'Good':wqStatus==='warn'?'Warning':'Critical';
+  var wqBadge = document.getElementById('wq-badge');
+  wqBadge.className = 'badge '+wqStatus;
+  wqBadge.textContent = wqStatus==='good' ? 'Within safe range' : (waterIssues[0] ? waterIssues[0].param+' out of range' : 'Issue detected');
+
+  document.getElementById('risk-status-text').textContent = statusLabel(maintResult.status);
+  var riskBadge = document.getElementById('risk-badge');
+  riskBadge.className = 'badge '+statusClass(maintResult.status);
+  riskBadge.textContent = 'Score '+maintResult.risk.toFixed(2);
+
+  document.getElementById('filter-age').textContent = Math.round(s.filterAgeDays)+' days';
+  document.getElementById('runtime-hours').textContent = Math.round(s.runtimeHours)+' h';
+
+  // Gauges
+  drawGauge('gauge-tds', 'TDS', s.tds, ' ppm', 0, 1300, 500, 1000, 0);
+  drawGauge('gauge-ph', 'pH Level', s.ph, '', 4, 10, 8.5, 9.5, 2);
+  drawGauge('gauge-turb', 'Turbidity', s.turbidity, ' NTU', 0, 6, 1, 5, 2);
+
+  // Risk ring + components
+  drawRiskRing(maintResult.risk, maintResult.status);
+  document.getElementById('risk-detail-status').textContent = statusLabel(maintResult.status);
+  document.getElementById('risk-detail-desc').textContent =
+    maintResult.status==='healthy' ? 'All systems operating within normal parameters.' :
+    maintResult.status==='monitor' ? 'Minor deviations detected. Continue monitoring, no action needed yet.' :
+    maintResult.status==='service_soon' ? 'Component wear detected. Schedule service within the next 1-2 weeks.' :
+    'Critical wear detected. Service recommended as soon as possible.';
+  renderComponentBars(maintResult.components);
+
+  // Alerts
+  renderAlerts(waterIssues, maintResult.alerts);
+
+  // Chart
+  drawTrendChart();
+}
+
+function renderLogs(){
+  var container = document.getElementById('log-entries');
+  if(logs.length===0){ container.innerHTML = '<div class="empty-alerts">No service history yet.</div>'; return; }
+  container.innerHTML = logs.slice().reverse().map(function(l){
+    return '<div class="entry"><b>'+l.action+'</b> — '+l.time+(l.note? ' — '+l.note : '')+'</div>';
+  }).join('');
+}
+
+// ---------------------------------------------------------------
+// Event wiring
+// ---------------------------------------------------------------
+document.getElementById('device-select').addEventListener('change', function(e){
+  currentDevice = e.target.value;
+  vibHistory = [];
+  render();
+});
+
+document.getElementById('log-submit').addEventListener('click', function(){
+  var action = document.getElementById('log-action').value;
+  var note = document.getElementById('log-note').value.trim();
+  var labelMap = {filter_replacement:'Filter replacement', compressor_service:'Compressor service', general_inspection:'General inspection'};
+  logs.push({ action: labelMap[action], note: note, time: new Date().toLocaleTimeString() });
+  if(action === 'filter_replacement'){ state[currentDevice].filterAgeDays = 0; }
+  document.getElementById('log-note').value = '';
+  renderLogs();
+  render();
+});
+
+// ---------------------------------------------------------------
+// Main loop
+// ---------------------------------------------------------------
+stepSimulation(); // seed one reading immediately
+render();
+renderLogs();
+
+setInterval(function(){
+  stepSimulation();
+  render();
+}, 4000);
+
+window.addEventListener('resize', drawTrendChart);
+
+})();
+</script>
+</body>
+</html>
